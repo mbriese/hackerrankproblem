@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HackerRank Practice</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f8;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        h1 {
+            background-color: #4CAF50;
+            color: white;
+            padding: 1rem;
+            margin: 0;
+        }
+        #timer {
+            font-size: 3rem;
+            margin: 1rem 0;
+        }
+        button {
+            margin: 0.25rem;
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        #problem {
+            font-size: 1.2rem;
+            margin: 1rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            display: inline-block;
+            max-width: 600px;
+        }
+        #problem a {
+            text-decoration: none;
+            color: #007acc;
+        }
+        #problem a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<h1>HackerRank Practice</h1>
+
+<div id="problem">Click "New Problem" to start</div>
+<div id="timer">00:00</div>
+
+<div>
+    <button onclick="setTimer(20)">Easy (20 min)</button>
+    <button onclick="setTimer(60)">Medium (60 min)</button>
+</div>
+
+<div>
+    <button onclick="startTimer()">Start</button>
+    <button onclick="stopTimer()">Stop</button>
+    <button onclick="resetTimer()">Reset</button>
+</div>
+
+<div>
+    <button onclick="newProblem()">New Problem</button>
+    <button onclick="markSolved()">Mark as Solved</button>
+    <button onclick="markUnsolved()">Mark as Unsolved</button>
+    <button onclick="skipProblem()">Skip This Problem</button>
+</div>
+
+<script>
+    let easyProblems = [
+        { name: "Solve Me First", url: "https://www.hackerrank.com/challenges/solve-me-first" },
+        { name: "Simple Array Sum", url: "https://www.hackerrank.com/challenges/simple-array-sum" },
+        { name: "Compare the Triplets", url: "https://www.hackerrank.com/challenges/compare-the-triplets" },
+        { name: "A Very Big Sum", url: "https://www.hackerrank.com/challenges/a-very-big-sum" },
+        { name: "Diagonal Difference", url: "https://www.hackerrank.com/challenges/diagonal-difference" },
+        { name: "Utopian Tree", url: "https://www.hackerrank.com/challenges/utopian-tree" },
+        { name: "Angry Professor", url: "https://www.hackerrank.com/challenges/angry-professor" },
+        { name: "Beautiful Days At The Movies", url: "https://www.hackerrank.com/challenges/beautiful-days-at-the-movies" },
+        { name: "Viral Advertising", url: "https://www.hackerrank.com/challenges/strange-advertising" },
+        { name: "Circular Array Rotation", url: "https://www.hackerrank.com/challenges/circular-array-rotation" },
+        { name: "Sequence Equation", url: "https://www.hackerrank.com/challenges/permutation-equation" },
+        { name: "Find Digits", url: "https://www.hackerrank.com/challenges/find-digits" },
+        { name: "Append and Delete", url: "https://www.hackerrank.com/challenges/append-and-delete" },
+        { name: "Sherlock and Squares", url: "https://www.hackerrank.com/challenges/sherlock-and-squares" }
+    ];
+
+    let mediumProblems = [
+        { name: "Sherlock and Anagrams", url: "https://www.hackerrank.com/challenges/sherlock-and-anagrams" },
+        { name: "Count Triplets", url: "https://www.hackerrank.com/challenges/count-triplets-1" },
+        { name: "Fraudulent Activity Notifications", url: "https://www.hackerrank.com/challenges/fraudulent-activity-notifications" },
+        { name: "Climbing the Leaderboard", url: "https://www.hackerrank.com/challenges/climbing-the-leaderboard" }
+    ];
+
+    let currentProblem = null;
+    let currentDifficulty = 'easy';
+    let timer;
+    let timeRemaining = 0;
+
+    function setTimer(minutes) {
+        timeRemaining = minutes * 60;
+        currentDifficulty = minutes === 20 ? 'easy' : 'medium';
+        displayTime();
+    }
+
+    function displayTime() {
+        let m = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+        let s = (timeRemaining % 60).toString().padStart(2, '0');
+        document.getElementById('timer').textContent = `${m}:${s}`;
+    }
+
+    function startTimer() {
+        if (timer) return;
+        timer = setInterval(() => {
+            if (timeRemaining > 0) {
+                timeRemaining--;
+                displayTime();
+            } else {
+                clearInterval(timer);
+                timer = null;
+                alert("Time's up!");
+            }
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timer);
+        timer = null;
+    }
+
+    function resetTimer() {
+        stopTimer();
+        setTimer(currentDifficulty === 'easy' ? 20 : 60);
+    }
+
+    function getSolvedProblems() {
+        return JSON.parse(localStorage.getItem('solvedProblems') || '[]');
+    }
+
+    function saveSolvedProblems(list) {
+        localStorage.setItem('solvedProblems', JSON.stringify(list));
+    }
+
+    function newProblem() {
+        let problems = currentDifficulty === 'easy' ? easyProblems : mediumProblems;
+        let solved = getSolvedProblems();
+
+        let unsolved = problems.filter(p => !solved.includes(p.name));
+        if (unsolved.length === 0) {
+            document.getElementById('problem').textContent = "All problems solved for this difficulty!";
+            return;
+        }
+        currentProblem = unsolved[Math.floor(Math.random() * unsolved.length)];
+        document.getElementById('problem').innerHTML = `<a href="${currentProblem.url}" target="_blank">${currentProblem.name}</a>`;
+    }
+
+    function markSolved() {
+        if (!currentProblem) return;
+        let solved = getSolvedProblems();
+        if (!solved.includes(currentProblem.name)) {
+            solved.push(currentProblem.name);
+            saveSolvedProblems(solved);
+        }
+        newProblem();
+    }
+
+    function markUnsolved() {
+        if (!currentProblem) return;
+        let solved = getSolvedProblems().filter(p => p !== currentProblem.name);
+        saveSolvedProblems(solved);
+        alert(currentProblem.name + " marked as unsolved.");
+    }
+
+    function skipProblem() {
+        newProblem();
+    }
+
+    // Initialize default
+    setTimer(20);
+</script>
+
+</body>
+</html>
