@@ -1,52 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>HackerRank Practice</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
-            text-align: center;
-            margin: 0;
-            padding: 0;
-        }
-        h1 {
-            background-color: #4CAF50;
-            color: white;
-            padding: 1rem;
-            margin: 0;
-        }
-        #timer {
-            font-size: 3rem;
-            margin: 1rem 0;
-        }
-        button {
-            margin: 0.25rem;
-            padding: 0.5rem 1rem;
-            font-size: 1rem;
-            cursor: pointer;
-        }
-        #problem {
-            font-size: 1.2rem;
-            margin: 1rem;
-            padding: 1rem;
-            background: white;
-            border-radius: 8px;
-            display: inline-block;
-            max-width: 600px;
-        }
-        #problem a {
-            text-decoration: none;
-            color: #007acc;
-        }
-        #problem a:hover {
-            text-decoration: underline;
-        }
+        body { font-family: Arial, sans-serif; background-color: #f4f6f8; text-align: center; margin: 0; padding: 0; }
+        h1 { background-color: #4CAF50; color: white; padding: 1rem; margin: 0; }
+        #timer { font-size: 3rem; margin: 1rem 0; }
+        button { margin: 0.25rem; padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; }
+        #problem { font-size: 1.2rem; margin: 1rem; padding: 1rem; background: white; border-radius: 8px; display: inline-block; max-width: 600px; }
+        #problem a { text-decoration: none; color: #007acc; }
+        #problem a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
-
 <h1>HackerRank Practice</h1>
 
 <div id="problem">Click "New Problem" to start</div>
@@ -71,7 +38,8 @@
 </div>
 
 <script>
-    let easyProblems = [
+    // ----- Problem Lists -----
+    const easyProblems = [
         { name: "Solve Me First", url: "https://www.hackerrank.com/challenges/solve-me-first" },
         { name: "Simple Array Sum", url: "https://www.hackerrank.com/challenges/simple-array-sum" },
         { name: "Compare the Triplets", url: "https://www.hackerrank.com/challenges/compare-the-triplets" },
@@ -88,78 +56,172 @@
         { name: "Sherlock and Squares", url: "https://www.hackerrank.com/challenges/sherlock-and-squares" }
     ];
 
-    let mediumProblems = [
+    const mediumProblems = [
         { name: "Sherlock and Anagrams", url: "https://www.hackerrank.com/challenges/sherlock-and-anagrams" },
         { name: "Count Triplets", url: "https://www.hackerrank.com/challenges/count-triplets-1" },
         { name: "Fraudulent Activity Notifications", url: "https://www.hackerrank.com/challenges/fraudulent-activity-notifications" },
         { name: "Climbing the Leaderboard", url: "https://www.hackerrank.com/challenges/climbing-the-leaderboard" }
     ];
 
+    // ----- Timer State -----
     let currentProblem = null;
     let currentDifficulty = 'easy';
-    let timer;
-    let timeRemaining = 0;
 
-    function setTimer(minutes) {
-        timeRemaining = minutes * 60;
-        currentDifficulty = minutes === 20 ? 'easy' : 'medium';
-        displayTime();
-    }
+    // We track a hard endTime (ms since epoch). Remaining time is computed from Date.now() each tick.
+    let endTime = null;         // number | null (ms)
+    let tickHandle = null;      // interval id
+    let defaultMinutes = 20;    // default to easy
 
-    function displayTime() {
-        let m = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
-        let s = (timeRemaining % 60).toString().padStart(2, '0');
+    // ----- Persistence Keys -----
+    const STORAGE_KEYS = {
+        solved: 'solvedProblems',
+        timer: 'hr_timer_state'   // { endTime:number|null, difficulty:"easy"|"medium" , defaultMinutes:number }
+    };
+
+    // ----- Utility: Time Display -----
+    function displayTimeFromRemaining(seconds) {
+        const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+        const s = Math.max(0, seconds % 60).toString().padStart(2, '0');
         document.getElementById('timer').textContent = `${m}:${s}`;
     }
 
+    function computeRemainingSeconds() {
+        if (!endTime) return 0;
+        return Math.max(0, Math.round((endTime - Date.now()) / 1000));
+    }
+
+    // ----- Timer Controls -----
+    function setTimer(minutes) {
+        defaultMinutes = minutes;
+        currentDifficulty = minutes === 20 ? 'easy' : 'medium';
+        // If running, adjust endTime relative to now; if stopped, just set display.
+        if (tickHandle) {
+            endTime = Date.now() + minutes * 60 * 1000;
+            saveTimerState();
+        }
+        displayTimeFromRemaining(minutes * 60);
+    }
+
     function startTimer() {
-        if (timer) return;
-        timer = setInterval(() => {
-            if (timeRemaining > 0) {
-                timeRemaining--;
-                displayTime();
-            } else {
-                clearInterval(timer);
-                timer = null;
-                alert("Time's up!");
-            }
-        }, 1000);
+        if (tickHandle) return; // already running
+        if (!endTime) {
+            endTime = Date.now() + defaultMinutes * 60 * 1000;
+        }
+        saveTimerState();
+        tickHandle = setInterval(tick, 250); // small interval; accuracy comes from Date.now()
+        tick(); // immediate paint
+        // Optional: request notification permission once
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
     }
 
     function stopTimer() {
-        clearInterval(timer);
-        timer = null;
+        if (tickHandle) {
+            clearInterval(tickHandle);
+            tickHandle = null;
+        }
+        // Freeze remaining by updating defaultMinutes to what’s left (rounded up)
+        const remaining = computeRemainingSeconds();
+        defaultMinutes = Math.ceil(remaining / 60) || defaultMinutes;
+        endTime = null;
+        saveTimerState();
+        displayTimeFromRemaining(remaining);
     }
 
     function resetTimer() {
-        stopTimer();
-        setTimer(currentDifficulty === 'easy' ? 20 : 60);
+        // Stop and reset to the current difficulty’s default
+        const minutes = currentDifficulty === 'easy' ? 20 : 60;
+        defaultMinutes = minutes;
+        if (tickHandle) {
+            clearInterval(tickHandle);
+            tickHandle = null;
+        }
+        endTime = null;
+        saveTimerState();
+        displayTimeFromRemaining(minutes * 60);
     }
 
+    function tick() {
+        const remaining = computeRemainingSeconds();
+        displayTimeFromRemaining(remaining);
+        if (remaining <= 0) {
+            clearInterval(tickHandle);
+            tickHandle = null;
+            endTime = null;
+            saveTimerState();
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("Time’s up!", { body: `Your ${currentDifficulty} timer finished.` });
+            } else {
+                alert("Time's up!");
+            }
+        }
+    }
+
+    // Keep accurate when tab visibility changes or computer sleeps/wakes
+    document.addEventListener("visibilitychange", () => {
+        // On show, force a tick to correct any drift
+        if (!document.hidden && tickHandle) tick();
+    });
+
+    // ----- Persistence -----
+    function saveTimerState() {
+        const state = {
+            endTime,
+            difficulty: currentDifficulty,
+            defaultMinutes
+        };
+        localStorage.setItem(STORAGE_KEYS.timer, JSON.stringify(state));
+    }
+
+    function loadTimerState() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEYS.timer);
+            if (!raw) return;
+            const state = JSON.parse(raw);
+            if (state && typeof state === 'object') {
+                currentDifficulty = state.difficulty || 'easy';
+                defaultMinutes = state.defaultMinutes || (currentDifficulty === 'easy' ? 20 : 60);
+                // Only restore endTime if it’s still in the future
+                if (typeof state.endTime === 'number' && state.endTime > Date.now()) {
+                    endTime = state.endTime;
+                    // Resume ticking if there’s time left
+                    tickHandle = setInterval(tick, 250);
+                    tick();
+                    return;
+                }
+            }
+        } catch { /* ignore */ }
+        // If we get here, show default time for current difficulty
+        displayTimeFromRemaining((currentDifficulty === 'easy' ? 20 : 60) * 60);
+    }
+
+    // ----- Solved/Unsolved Tracking -----
     function getSolvedProblems() {
-        return JSON.parse(localStorage.getItem('solvedProblems') || '[]');
+        return JSON.parse(localStorage.getItem(STORAGE_KEYS.solved) || '[]');
     }
 
     function saveSolvedProblems(list) {
-        localStorage.setItem('solvedProblems', JSON.stringify(list));
+        localStorage.setItem(STORAGE_KEYS.solved, JSON.stringify(list));
     }
 
     function newProblem() {
-        let problems = currentDifficulty === 'easy' ? easyProblems : mediumProblems;
-        let solved = getSolvedProblems();
+        const problems = currentDifficulty === 'easy' ? easyProblems : mediumProblems;
+        const solved = getSolvedProblems();
+        const unsolved = problems.filter(p => !solved.includes(p.name));
+        const problemEl = document.getElementById('problem');
 
-        let unsolved = problems.filter(p => !solved.includes(p.name));
         if (unsolved.length === 0) {
-            document.getElementById('problem').textContent = "All problems solved for this difficulty!";
+            problemEl.textContent = "All problems solved for this difficulty!";
             return;
         }
         currentProblem = unsolved[Math.floor(Math.random() * unsolved.length)];
-        document.getElementById('problem').innerHTML = `<a href="${currentProblem.url}" target="_blank">${currentProblem.name}</a>`;
+        problemEl.innerHTML = `<a href="${currentProblem.url}" target="_blank" rel="noopener noreferrer">${currentProblem.name}</a>`;
     }
 
     function markSolved() {
         if (!currentProblem) return;
-        let solved = getSolvedProblems();
+        const solved = getSolvedProblems();
         if (!solved.includes(currentProblem.name)) {
             solved.push(currentProblem.name);
             saveSolvedProblems(solved);
@@ -169,7 +231,7 @@
 
     function markUnsolved() {
         if (!currentProblem) return;
-        let solved = getSolvedProblems().filter(p => p !== currentProblem.name);
+        const solved = getSolvedProblems().filter(p => p !== currentProblem.name);
         saveSolvedProblems(solved);
         alert(currentProblem.name + " marked as unsolved.");
     }
@@ -178,9 +240,23 @@
         newProblem();
     }
 
-    // Initialize default
-    setTimer(20);
-</script>
+    // ----- Init -----
+    (function init() {
+        // default difficulty/time
+        displayTimeFromRemaining(20 * 60);
+        // restore timer if present
+        loadTimerState();
+    })();
 
+    // expose for buttons
+    window.setTimer = setTimer;
+    window.startTimer = startTimer;
+    window.stopTimer = stopTimer;
+    window.resetTimer = resetTimer;
+    window.newProblem = newProblem;
+    window.markSolved = markSolved;
+    window.markUnsolved = markUnsolved;
+    window.skipProblem = skipProblem;
+</script>
 </body>
 </html>
